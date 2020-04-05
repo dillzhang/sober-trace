@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.10.2/p5.js"> </script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/0.10.2/addons/p5.sound.min.js"> </script>
+        <script src="https://unpkg.com/ml5@0.4.2/dist/ml5.min.js"></script>
+        <link rel="stylesheet" type="text/css" href="style.css" />
+        <meta charset="utf-8" />
+    </head>
+    <body>
+        <div class="page">
+            <h1 class="title">LINE</h1>
+
+            <div class="container">
+                <div class="instructions">
+                    <b>Instructions</b>: <span id="instruct">Please wait</span>
+                </div>
+                <div id="canvasContainer"><div id="loading" class="loading">Loading...</div></div>
+                <div id="info" class="info invisible">
+                    <p>
+                        <b>Time</b>: <span id="time">0</span> seconds
+                    </p>
+                    <p>
+                        <b>Average Distance Wandered</b>: <span id="distance">0</span> pixels
+                    </p>
+                </div>
+            </div>
+            <h1 class="title">TRACER</h1>
+        </div>
+        <script src="levels.js"></script>
+        <script src="camera.js"></script>
+        <script src="sketch.js"></script>
+    </body>
+</html>
