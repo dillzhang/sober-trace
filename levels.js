@@ -1,97 +1,45 @@
 // x -> RANGE: 640 - 0 -> CALLIBRATE 620 - 20 -> BOUND 600 - 40
 // y -> RANGE: 0 - 480 -> CALLIBRATE 20 - 460 -> BOUND 40 - 440
 
-const callibrationPoints = [
+const widthOffset = 20;
+
+const ballSize = 40;
+
+const ballSpeed = 3.33;
+
+const paddleHeight = 20;
+const paddleWidth = 200;
+
+const upperPaddleY = 20 + paddleHeight;
+const lowerPaddleY = 460 - paddleHeight;
+
+
+const callibrationBars = [
     {
-        x: 620,
-        y: 20,
+        start: 20,
+        end: 40,
     },
     {
-        x: 20,
-        y: 20,
+        start: 170,
+        end: 190,
     },
     {
-        x: 20,
-        y: 460,
+        start: 450,
+        end: 470,
     },
     {
-        x: 620,
-        y: 460,
+        start: 600,
+        end: 620,
     },
 ];
 
-const startTarget = {
-    x: 320,
-    y: 240,
-};
-
-const levels = [
-// LEVEL 1
-    [
-        {
-            x: 600,
-            y: 240,
-        },
-        {
-            x: 40,
-            y: 240,
-        },
-    ],
-// LEVEL 2
-    [
-        {
-            x: 600,
-            y: 170,
-        },
-        {
-            x: 488,
-            y: 170,
-        },
-        {
-            x: 376,
-            y: 340,
-        },
-        {
-            x: 264,
-            y: 340,
-        },
-        {
-            x: 152,
-            y: 170,
-        },
-        {
-            x: 40,
-            y: 170,
-        },
-    ],
-// LEVEL 3
-    [
-        {
-            x: 600,
-            y: 40,
-        },
-        {
-            x: 420,
-            y: 310,
-        },
-        {
-            x: 220,
-            y: 310,
-        },
-        {
-            x: 420,
-            y: 170,
-        },
-        {
-            x: 220,
-            y: 170,
-        },
-        {
-            x: 40,
-            y: 440,
-        },
-    ],
+const startBars = [
+    {
+        start: 235,
+        end: 255,
+    },
+    {
+        start: 385,
+        end: 405,
+    },
 ];
-
-// x -> RANGE: 640 - 0 -> CALLIBRATE 620 - 20 -> BOUND 600 - 40
-// y -> RANGE: 0 - 480 -> CALLIBRATE 20 - 460 -> BOUND 40 - 440

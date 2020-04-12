@@ -8,7 +8,7 @@ const ERROR_TOLERANCE = 5;
 
 let video;
 let poseNet;
-let nose;
+let shoulders;
 let loaded = false;
 let started = false;
 let calibrated = false;
@@ -43,6 +43,9 @@ const invisibleElement = (element) => {
     }
   };
 
+let xAxis;
+let yAxis;
+
 function setup() {
   let cnv = createCanvas(TARGET_WIDTH, TARGET_HEIGHT);
   cnv.parent("canvasContainer");
@@ -51,6 +54,9 @@ function setup() {
 
   poseNet = ml5.poseNet(video, modelLoaded);
   poseNet.on("pose", getPose);
+
+  xAxis = createVector(1,0);
+  yAxis = createVector(0,1);
 }
 
 const modelLoaded = () => {
@@ -60,206 +66,246 @@ const modelLoaded = () => {
 
 const getPose = (poses) => {
   if (poses.length > 0) {
-    const p = poses[0].pose;
-    if (p.score > 0.15 && p.nose && p.nose.confidence > 0.8) {
-        nose = p.nose;
-    }
+    shoulders = poses[0].pose.keypoints.filter(kp => {
+        return (kp.part == "leftShoulder" || kp.part == "rightShoulder") && kp.score > 0.5;
+    });
+  } else {
+    shoulders = undefined;
   }
 };
 
-const drawPose = (nose) => {
-    const { x, y } = nose;
-    strokeWeight(0);
-    fill(0, 0, 255);
-    ellipse(x, y, 8);
+function drawPose() {
+    if (shoulders.length == 2) {
+        const x1 = shoulders[0].position.x;
+        const y1 = shoulders[0].position.y;
+        const x2 = shoulders[1].position.x;
+        const y2 = shoulders[1].position.y;
+        stroke(0,0,0);
+        strokeWeight(4);
+        line(x1, y1, x2, y2);
+    }
+
+    shoulders.forEach(kp => {
+        const {x ,y} = kp.position;
+        stroke(0,0,0);
+        strokeWeight(2);
+        fill(255, 0, 0);
+        ellipse(x, y, 8);
+    });
 };
 
-const drawLevel = (level) => {
-
-    for (let i=0; i < level.length - 1; i++) {
-        strokeWeight(4);
-        stroke(249, 212, 35);
-        line(level[i].x, level[i].y, level[i+1].x, level[i+1].y);
-    }
-}
-
-const drawPath = (record) => {
-    for (let i=0; i < record.length - 1; i++) {
-        strokeWeight(3);
-        stroke(63, 184, 175);
-        line(record[i].x, record[i].y, record[i+1].x, record[i+1].y);
-    }
-}
-
-const drawTarget = (target, onTarget, size=TARGET_SIZE) => {
-    strokeWeight(1);
-    stroke(0, 0, 0);
-    if ( onTarget ) {
-        fill(42,214,157, 90);
-    } else {
-        fill(255,78,80, 90);
-    }
-    ellipse(target.x, target.y, size * 2);
-}
-
 let state = "callibrate";
+let reps = 0;
+let ballPosition;
+let velocity;
+let gameOver = false;
+let nextRound;
 
-let lastOutside = Date.now();
-
-let level = 0;
-
-let record = false;
-let recordTime = Date.now();
-let points = [];
-let levelFinished = false;
-let finishedTime = Date.now();
-
-const newLevel = () => {
-    record = false;
-    points = [];
-    levelFinished = false;
+const newGame = () => {
+    reps = 0;
+    ballPosition = createVector(320, 240);
+    // velocity = p5.Vector.random2D();
+    velocity = createVector(0.8, 0.6);
+    velocity.mult(ballSpeed);
+    gameOver = false;
 }
 
-const distance = (a, b) => {
-    return (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
-}
+let lastCallibratedCorrectly = Date.now();
+function callibration() {
 
-const pathDifferences = (path, level) => {
-    const distances = path.map(C => {
-        const pds = [];
-        for (let i=0; i < level.length - 1; i++) {
-            const A = level[i];
-            const B = level[i + 1];
-            const numerator = Math.abs((B.x - A.x) * (C.y - A.y) - (B.y - A.y) * (C.x - A.x));
-            const denomator = Math.sqrt(distance(A,B));
-            const output = numerator / denomator;
-            if (isNaN(output)){
-                console.log(A,B,C, numerator, denomator);
+    let instructions = "<b>Callibrating</b> - ";
+
+    const frame = video.get();
+    image(frame, 0, 0);   
+
+    if (shoulders) {
+        drawPose();
+        if (shoulders.length == 2) {
+            const distance = Math.abs(shoulders[0].position.x - shoulders[1].position.x);
+            if (distance < 130) {
+                instructions += "You're too far back. Take a step closer."
+            } else if (distance > 170) {
+                instructions += "You're too close. Take a step back."
+            } else {
+                instructions += "Make sure you can align yourself with the red bars."
             }
-            pds.push(numerator / denomator);
+        } else {
+            instructions += "Locating your body."
         }
-        const smallestDistance = Math.max(pds.reduce((a,b) => a < b ? a : b, pds[0]) - ERROR_TOLERANCE, 0);
-        if (isNaN(smallestDistance)){
-            console.log(pds, ERROR_TOLERANCE);
-        }
-        return smallestDistance;
-    });
-    const finalValue = distances.reduce((a,b) => a + b, 0) / distances.length;
-    if (isNaN(finalValue)) {
-        console.log(distances);
+    } else {
+        instructions += "Locating your body."
     }
-    return finalValue;
+
+    instructions += "<br>";
+
+    callibrationBars.forEach(bar => {
+        strokeWeight(1);
+        if (shoulders && shoulders.some(s => bar.start <= s.position.x && s.position.x <= bar.end)) {
+            fill(0,111,60, 20);
+        } else {
+            fill(191,33,47, 20);
+        }
+        rect(bar.start, video.height * 0, bar.end - bar.start, video.height);
+    });
+
+    startBars.forEach(bar => {
+        strokeWeight(1);
+        if (shoulders && shoulders.some(s => bar.start <= s.position.x && s.position.x <= bar.end)) {
+            fill(0,111,60, 20);
+        } else {
+            fill(249,167,62, 20);
+            lastCallibratedCorrectly = Date.now();
+        }
+        rect(bar.start, video.height * 0, bar.end - bar.start, video.height);
+    });
+
+    const now = Date.now();
+    if (lastCallibratedCorrectly + 3000 < now) {
+        newGame();
+        state = "play";
+    } else {
+        if (now - lastCallibratedCorrectly > 500) {
+            instructions += `Starting in ${3 - Math.floor((now - lastCallibratedCorrectly) / 1000)}`;
+        } else {
+            instructions += "When ready, hover over middle bars for 3 seconds.";
+        }
+    }
+
+    instructionSpan.innerHTML = instructions;
 }
+
+
+let center = 320;
+function playGame() {
+
+    noStroke();
+    const frame = video.get();
+    image(frame, 0, 0);
+    fill(0, 0, 0);
+    rect(0, 0, widthOffset, video.height);
+    rect(video.width - widthOffset, 0, widthOffset, video.height);
+    stroke(1);
+    if (!shoulders) {
+        return;
+    }
+
+    // Draw ball
+    stroke(0, 0, 0);
+    strokeWeight(1);
+    fill(39,179,118, 80);
+    ellipse(ballPosition.x, ballPosition.y, ballSize);
+
+    // Draw paddles
+    if (shoulders.length == 2) {
+        center = (shoulders[0].position.x + shoulders[1].position.x) / 2
+        console.log(center);
+    }
+    stroke(0, 0, 0);
+    strokeWeight(1);
+    fill(38,75,150, 80);
+    rect(center - paddleWidth / 2, upperPaddleY, paddleWidth,  - paddleHeight);
+    rect(center - paddleWidth / 2, lowerPaddleY, paddleWidth, paddleHeight);
+
+    // Update ball
+    ballPosition.add(velocity);
+
+    const leftBound = widthOffset + ballSize / 2;
+    if (ballPosition.x <= leftBound) {
+        const difference = leftBound - ballPosition.x;
+        velocity.set(-velocity.x, velocity.y);
+        ballPosition.set(leftBound + difference, ballPosition.y);
+    }
+
+    const rightBound = video.width - widthOffset - ballSize / 2;
+    if (ballPosition.x >= rightBound) {
+        const difference = ballPosition.x - rightBound;
+        velocity.set(-velocity.x, velocity.y);
+        ballPosition.set(rightBound - difference, ballPosition.y);
+    }
+
+    const canPaddleBounce = Math.abs(center - ballPosition.x) <= paddleWidth / 2;
+
+    const upperBound = upperPaddleY + ballSize / 2;
+    if (ballPosition.y <= upperBound) {
+        if (canPaddleBounce && !gameOver) {
+        const difference = upperBound - ballPosition.y;
+        velocity.set(velocity.x + Math.random() - 0.5, -velocity.y);
+        velocity.normalize();
+        velocity.mult(ballSpeed);
+        ballPosition.set(ballPosition.x + Math.random(), upperBound + difference);
+        reps += 1;
+        } else {
+            gameOver = true;
+        }
+    }
+
+    const lowerBound = lowerPaddleY - ballSize / 2;
+    if (ballPosition.y >= lowerBound) {
+        if (canPaddleBounce && !gameOver) {
+            const difference = ballPosition.y - lowerBound;
+            velocity.set(velocity.x + Math.random() - 0.5, -velocity.y);
+            velocity.normalize();
+            velocity.mult(ballSpeed);
+            ballPosition.set(ballPosition.x, lowerBound - difference);
+            reps += 1;
+        } else {
+            gameOver = true;
+        }
+    }
+    console.log(gameOver);
+
+    // Check lose
+    if (gameOver && (ballPosition.y < 0 + ballSize / 2 || ballPosition.y > video.height - ballSize / 2)) {
+        goToReveal();
+    }
+}
+
+function goToReveal() {
+    nextRound = Date.now() + 5000;
+    state = "reveal";
+}
+
+function showReveal() {
+    const score =  `GAME OVER\n  ${reps} bounces`
+    scale(-1, 1);
+    translate(-video.width, 0);
+    fill(38,75,150);
+    textSize(50);
+    text(score, 320 - 200, 240 - 150, 400, 300);
+    console.log(nextRound);
+    instructionSpan.innerHTML = `New game in ${Math.ceil((nextRound - Date.now() )/1000)} seconds.`
+
+    if (Date.now() > nextRound) {
+        state = "callibrate";
+    }
+}
+
+let debug = false;
 
 function draw() {
     // move image by the width of image to the right
     // then scale it by -1 in the x-axis to flip the image
     // draw video capture feed as image inside p5 canvas
+    clear();
+    instructionSpan.innerHTML = "";
     translate(TARGET_WIDTH, 0);
     scale(- TARGET_WIDTH / video.width, TARGET_HEIGHT / video.height);
-    const frame = video.get();
-    if (state != "reveal") {
-        image(frame, 0, 0);   
-    } else {
-        clear();
+
+    if (debug) {
+        goToReveal();
+        reps = 50;
+        debug = false;
     }
 
-    if (!nose) {
-        instructionSpan.innerHTML = "Locating your face!"
-        return;
-    }
-
-    if (state != "reveal") {
-        drawPose(nose);
-    }
-
+    console.log("state: ", state);
     if (state == "callibrate") {
-        console.log("Callibrating");
-        instructionSpan.innerHTML = "Make sure you can reach each of the outer targets. Hover over the center target for 3 seconds to start."
-        callibrationPoints.forEach(p => {
-            const d = distance(nose, p);
-            const withinD = d < CALLIBRATION_SIZE ** 2;
-            drawTarget(p, withinD, CALLIBRATION_SIZE);
-        });
-        const startDistance = distance(nose, startTarget);
-        const withinStart = startDistance < TARGET_SIZE ** 2;
-        if (!withinStart) {
-            lastOutside = Date.now();
-        } else {
-            instructionSpan.innerHTML = `Starting in ${Math.ceil((lastOutside + 3000 - Date.now()) / 1000)}...`
-        }
-        drawTarget(startTarget, withinStart);
-        if (lastOutside + 3000 < Date.now()) {
-            state = "level";
-            newLevel();
-            level = 0;
-        }
-    } else if (state == "level") {
-        drawLevel(levels[level]);
-
-        if (levelFinished && finishedTime + 500 < Date.now()) {
-            console.log("Level Finished");
-            state = "reveal"
-        } else {
-            instructionSpan.innerHTML = "Move to the target circle. It will turn green when you are within it."
-
-            const starter = levels[level][0];
-            const distanceToStarter = distance(nose, starter);
-            const withinStarter = distanceToStarter < TARGET_SIZE ** 2;
-            if (!levelFinished && withinStarter) {
-                if (!record) {
-                    recordTime = Date.now();
-                }
-                record = true;
-            }
-            if (!record || recordTime + 500 > Date.now()) {
-                drawTarget(starter, withinStarter);
-            }
-
-            if (record) {
-
-                instructionSpan.innerHTML = "Follow the yellow line to the target."
-                points.push({x:nose.x, y:nose.y});
-            }
-
-            const ender = levels[level][levels[level].length - 1];
-            const distanceToEnder = distance(nose, ender);
-            const withinEnder = distanceToEnder < TARGET_SIZE ** 2
-            if (!levelFinished && withinEnder) {
-                
-                record = false;
-                levelFinished = true;
-                finishedTime = Date.now();
-                console.log("done");
-            }
-            if (record || finishedTime + 500 > Date.now()) {
-                drawTarget(ender, withinEnder);
-            }
-        }
+        callibration();
+    } else if (state == "play") {
+        playGame();
     } else if (state == "reveal") {
-        drawLevel(levels[level]);
-        instructionSpan.innerHTML = `Check out your results. Next round starting in ${Math.ceil((finishedTime + 10500 - Date.now()) / 1000)}.`
-        timeSpan.innerHTML = (finishedTime - recordTime) / 1000;
-        const diffs = pathDifferences(points, levels[level]);
-        console.log(diffs, points, levels[level]);
-        if (isNaN(diffs)) {
-            console.log(points, levels[level]);
-        }
-        distanceSpan.innerHTML = diffs;
-        visibleElement(infoDiv);
-        drawPath(points);
-        if (finishedTime + 10500 < Date.now()) {
-            invisibleElement(infoDiv);
-            console.log("Next Level");
-            state = "level";
-            newLevel();
-            level += 1;
-            if (level == levels.length) {
-                state = "callibrate";
-            }
-        }
+        showReveal();
     } else {
         state = "callibrate"
     }
-  }
+}
   

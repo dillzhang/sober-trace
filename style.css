@@ -1,11 +1,12 @@
 :root {
     --off-white: #eee;
-    --main-bg-color: #9A7E8C;
+    --main-bg-color: 	#264b96;
 }
 
 body {
     font-family: 'Roboto', sans-serif;
     background-color: var(--main-bg-color);
+    color: var(--off-white)
 }
 
 .page {
@@ -55,6 +56,10 @@ body {
     width: inherit;
     height: inherit;
     font-size: 60px;
+}
+
+.instructions {
+    font-size: 20px;
 }
 
 .info {
